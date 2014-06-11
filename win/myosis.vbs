@@ -15,9 +15,6 @@ Option Explicit
 'On Error Resume Next
 
 'These are constants for our sql connection later....
-Const adOpenStatic = 3
-Const adLockOptimistic = 3
-Const adUseClient = 3
 Const ScriptVer = "0.1"
 'The database server for TESTING
 Const DBServer = "."
@@ -30,7 +27,7 @@ Const DBFile = "MyOSIS"
 Dim ComputerName, ComputerDomain, UserName, DomainName, TimeZone, MachineModel, MachineSerial
 Dim MACAddress, IPAddress, SessionName, ClientName, LogonDC, OpSys, LastBoot, FullUserName
 Dim wShell, wshNetwork, objWMIService, colLection, objItem, objConn, objRS
-Dim EnviroTypes, WshSysEnv, x, LogInOut, ExitCounter, DBFile, DBServer
+Dim EnviroTypes, WshSysEnv, x, LogInOut, ExitCounter
 
 'Some environment variables are wacky, 
 'this array helps us cycle through the types to find the one we're looking for.
@@ -56,7 +53,7 @@ Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\roo
 '==============================================================================================
 'ENTR'ACTE
 'Get Command Line arguments for log in or out (the function is at the end of the script).
-LogInOut = ParseCLI()
+ParseCLI
 
 
 
@@ -89,31 +86,31 @@ Sub WriteEventLog(sText)
 	wShell.LogEvent 0, "MyOSIS.vbs: " & sText
 End Sub
 
-Function ParseCLI()
+Sub ParseCLI()
 	'This reads throught the command line switches and acts accordingly
-	Dim oArgs, i, sArgs, sT
-	On Error Resume Next
-	Set oArgs = WScript.Arguments ' create object with collection
-	'then cycle through 'em
+	Dim oArgs, i, sA
+	Set oArgs = WScript.Arguments
 	For i = 0 to oArgs.Count - 1
-		'The temp variable just saves me some typing
-		sT = UCase(oArgs(i))
-		sT = Replace(sT, "/", "")
-		sT = Replace(sT, "-", "")
-		Select Case Left(sT, 1)
-			Case "I"
-				sArgs = "IN"
-			Case "O"
-				sArgs = "OUT"
-			Case Else
-				'The off chance the script is just run w/out a valid switch
-				sArgs = "NONE"
+		sA = oArgs(i)
+		'Let's see if this is a number
+		If IsNumeric(sA) Then 
+			'aha, if it's between 0 and 100 then it's our new Alert Threshold
+			If (sA < 100) And (sA > 0) Then AlertThresholdPercent = sA
+		End If
+		
+		Select Case Left(UCase(sA), 2)
+			Case "/?", "-?", "/H", "-H", "-HELP"
+				DoHelp
+			Case "/s", "/S", "-s", "-S"
+				'Send the output to the screen, rather than an email
+				bToScreen = True
+				bToEmail = False
+			Case "/d", "/D", "-d", "-D"
+				bDebug = True
+				'The database server for TESTING
 		End Select
 	Next
-	sArgs = Trim(sArgs)
-	If Len(sArgs) = 0 Then sArgs = "NONE"
-	ParseCLI = sArgs
-End Function
+End Sub
 
 Function ReadReg(sWhich)
 	'This is a silly reg-reader for the name information (user, domain, and computer)
@@ -182,18 +179,30 @@ End Function
 Sub DoHelp
 	Dim sB
 	sB = ""
-	sB = sB & string(76, "-") & VbCrLf
-	sB = sB & "SpaceMailer" & VbCrLf
-	sB = sB & string(76, "-") & VbCrLf
-	sB = sB & "Gathers drive space information for all local hard drives and emails" & VbCrLf
-	sB = sB & "that information in a report to admins." & VbCrLf
+	sB = sB & string(74, "-") & VbCrLf
+	sB = sB & "MyOSIS" & VbCrLf
+	sB = sB & string(74, "-") & VbCrLf
+	sB = sB & "Gathers boatloads of system information and outputs the results" & vbCrLf 
+	sB = sB & "to text, html, or SQL db." & vbCrLf
 	sB = sB & VbCrLf
-	sB = sB & "Usage: spacemailer [percent] [email1] [email2] [email...]" & VbCrLf
-	sB = sB & VbCrLf
+	sB = sB & "Usage: " & vbCrLf 
+	sB = sB & "  myosis.vbs [ -options ] [ host ]" & VbCrLf
+	sB = sB & vbCrLf
 	sB = sB & "Options: "  & VbCrLf
-	sB = sB & VbCrLf
-	sB = sB & "percent    if freespace is below this percent, issues an alert (default=20)" & VbCrLf
-	sB = sB & "email      email addresses for the report (separate by spaces; default=Is)" & VbCrLf
+	sB = sB & vbCrLf
+	sB = sB & " host              system to query (local system is default)" & vbCrLf
+	sB = sB & vbCrLf
+	sB = sB & " Output type (select ONE; -screen is default)" & vbCrLf
+	sB = sB & "   -d | -db        save to database" & vbCrLf
+	sB = sB & "   -t | -txt       save to text" & VbCrLf
+	sB = sB & "   -h | -html      save to html" & VbCrLf
+	sB = sB & "   -s | -screen    output to screen (default)" & VbCrLf
+	sB = sB & "   -q | -query     save SQL update statement" & VbCrLf
+	sB = sB & vbCrLf
+	sB = sB & "Examples:" & vbCrLf
+	sB = sB & vbCrLf
+	sB = sB & " myosis.vbs -t:file.txt calcium" & vbCrLf
+	sB = sB & " myosis.vbs -h:""Note the quotes for spaces.html"""  & vbCrLf
 	sB = sB & VbCrLf
 	sB = sB & VbCrLf
 	
